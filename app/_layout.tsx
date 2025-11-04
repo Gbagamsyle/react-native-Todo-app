@@ -3,6 +3,7 @@ import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 import * as styledComponents from 'styled-components/native';
 
@@ -32,13 +33,15 @@ function AppContent() {
 
   return (
     <NavigationThemeProvider value={theme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Container>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      </Container>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Container>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+        </Container>
+      </GestureHandlerRootView>
     </NavigationThemeProvider>
   );
 }

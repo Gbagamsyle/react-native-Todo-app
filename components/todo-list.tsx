@@ -3,12 +3,9 @@ import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { Todo } from '@/types/todo';
 import { useMutation, useQuery } from 'convex/react';
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import DraggableFlatList, {
-    RenderItemParams,
-    ScaleDecorator
-} from 'react-native-draggable-flatlist';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { EditTodo } from './edit-todo';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -21,77 +18,74 @@ interface TodoListProps {
 
 export const TodoList: React.FC<TodoListProps> = ({ searchQuery = '', optimisticAdds = [] }) => {
   const { theme } = useTheme();
-  const todos = (useQuery(api.todos.list) || []) as Todo[];
-  const cardBg = theme === 'dark' ? '#25273D' : '#ffffff';
-  const shadowColor = theme === 'dark' ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.15)';
+
+  // ===== Hooks must be at the top =====
+  const todos = useQuery(api.todos.list);
   const updateTodo = useMutation(api.todos.update);
   const deleteTodo = useMutation(api.todos.remove);
   const updateOrder = useMutation(api.todos.updateOrder);
   const clearCompleted = useMutation(api.todos.clearCompleted);
+
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [pendingToggles, setPendingToggles] = useState<Record<string, boolean>>({});
   const [removedIds, setRemovedIds] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [localOrder, setLocalOrder] = useState<Todo[] | null>(null);
 
-  // merge optimistic adds at the front, exclude removed ids, and apply pending toggle overrides
-  let mergedTodos: Todo[] = [];
-  if (localOrder) {
-    mergedTodos = localOrder;
-  } else {
-    if (optimisticAdds && optimisticAdds.length > 0) {
-      mergedTodos.push(...optimisticAdds);
-    }
-    for (const t of todos) {
-      if (removedIds[(t._id as any) as string]) continue;
-      // skip if optimistic add has same id
-      if (optimisticAdds && optimisticAdds.some((ot: Todo) => ot._id === (t._id as any))) continue;
-      const overridden: Todo = {
-        ...t,
-        completed: pendingToggles[(t._id as any) as string] ?? t.completed,
-      } as Todo;
-      mergedTodos.push(overridden);
-    }
-  }
+  const cardBg = theme === 'dark' ? '#25273D' : '#ffffff';
+  const shadowColor = theme === 'dark' ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.15)';
 
-  let filteredTodos = mergedTodos.filter((todo: Todo) =>
-    todo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    todo.description.toLowerCase().includes(searchQuery.toLowerCase())
+  // ===== Merged todos (including optimistics, pending toggles, removed ids) =====
+  const mergedTodos = useMemo(() => {
+    if (!todos) return [];
+    if (localOrder) return localOrder;
+
+    const merged: Todo[] = [];
+    if (optimisticAdds.length > 0) merged.push(...optimisticAdds);
+
+    for (const t of todos) {
+      const idStr = t._id as string;
+      if (removedIds[idStr]) continue;
+      if (optimisticAdds.some((ot) => ot._id === idStr)) continue;
+      merged.push({ ...t, completed: pendingToggles[idStr] ?? t.completed });
+    }
+    return merged;
+  }, [todos, optimisticAdds, removedIds, pendingToggles, localOrder]);
+
+  // ===== Filtered todos based on search + filter =====
+  const filteredTodos = useMemo(() => {
+    let filtered = mergedTodos.filter(todo =>
+      todo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      todo.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    if (filter === 'active') filtered = filtered.filter(t => !t.completed);
+    else if (filter === 'completed') filtered = filtered.filter(t => t.completed);
+
+    return filtered;
+  }, [mergedTodos, searchQuery, filter]);
+
+  // ===== Drag & drop handler =====
+  const handleDragEnd = useCallback(
+    ({ data }: { data: Todo[] }) => {
+      setLocalOrder(data);
+      const updates = data.map((todo, index) => ({ id: todo._id as Id<'todos'>, order: index }));
+      updateOrder({ items: updates }).finally(() => setLocalOrder(null));
+    },
+    [updateOrder]
   );
 
-  if (filter === 'active') {
-    filteredTodos = filteredTodos.filter((todo) => !todo.completed);
-  } else if (filter === 'completed') {
-    filteredTodos = filteredTodos.filter((todo) => todo.completed);
-  }
-
-  const handleDragEnd = ({ data }: { data: Todo[] }) => {
-    setLocalOrder(data); // optimistic update
-    const updates = data.map((todo, index) => ({
-      id: todo._id as Id<'todos'>,
-      order: index,
-    }));
-    updateOrder({ items: updates }).finally(() => {
-      setLocalOrder(null); // reset to server order after mutation
-    });
-  };
-
-  const renderItem = ({ item, drag, isActive }: RenderItemParams<Todo>) => {
-    return (
+  // ===== Render each todo item =====
+  const renderItem = useCallback(
+    ({ item, drag, isActive }: RenderItemParams<Todo>) => (
       <ScaleDecorator>
-        <View style={[
-          isActive && styles.draggingItem,
-          isActive && { backgroundColor: theme === 'dark' ? '#393A4B' : '#E3E4F1' }
-        ]}>
+        <View style={[isActive && styles.draggingItem, isActive && { backgroundColor: theme === 'dark' ? '#393A4B' : '#E3E4F1' }]}>
           <TodoItem
             todo={item}
             onToggle={(completed) => {
-              // optimistic toggle
-              const idStr = (item._id as any) as string;
+              const idStr = item._id as string;
               setPendingToggles((s) => ({ ...s, [idStr]: completed }));
-              updateTodo({ id: item._id as Id<'todos'>, completed }).catch((err) => {
-                console.error('Toggle failed', err);
-                // revert
+              updateTodo({ id: item._id as Id<'todos'>, completed }).catch(() => {
                 setPendingToggles((s) => {
                   const copy = { ...s };
                   delete copy[idStr];
@@ -101,11 +95,9 @@ export const TodoList: React.FC<TodoListProps> = ({ searchQuery = '', optimistic
             }}
             onEdit={() => setEditingTodo(item)}
             onDelete={() => {
-              const idStr = (item._id as any) as string;
-              // optimistic remove
+              const idStr = item._id as string;
               setRemovedIds((s) => ({ ...s, [idStr]: true }));
-              deleteTodo({ id: item._id as Id<'todos'> }).catch((err) => {
-                console.error('Delete failed', err);
+              deleteTodo({ id: item._id as Id<'todos'> }).catch(() => {
                 setRemovedIds((s) => {
                   const copy = { ...s };
                   delete copy[idStr];
@@ -117,14 +109,23 @@ export const TodoList: React.FC<TodoListProps> = ({ searchQuery = '', optimistic
           />
         </View>
       </ScaleDecorator>
+    ),
+    [theme, updateTodo, deleteTodo]
+  );
+
+  // ===== Loading fallback =====
+  if (!todos) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme === 'dark' ? '#FFF' : '#000'} />
+        <ThemedText style={{ marginTop: 12 }}>Loading todos...</ThemedText>
+      </View>
     );
-  };
-
-
+  }
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: theme === 'dark' ? '#171823' : '#F9FAFB' }]}>
-      <View style={[styles.centerWrapper]}>
+      <View style={styles.centerWrapper}>
         <View style={[styles.card, { backgroundColor: cardBg, shadowColor }]}>
           <DraggableFlatList
             data={filteredTodos}
@@ -132,43 +133,32 @@ export const TodoList: React.FC<TodoListProps> = ({ searchQuery = '', optimistic
             keyExtractor={(item) => item._id.toString()}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
+            extraData={{ pendingToggles, removedIds }}
           />
 
-          <View style={[
-            styles.footer, 
-            { 
-              backgroundColor: cardBg,
-              borderTopColor: theme === 'dark' ? '#393A4B' : '#E3E4F1'
-            }
-          ]}>
-            <ThemedText 
-              style={[
-                styles.footerLeft,
-                { color: theme === 'dark' ? '#5B5E7E' : '#9495A5' }
-              ]}
-            >
+          <View style={[styles.footer, { backgroundColor: cardBg, borderTopColor: theme === 'dark' ? '#393A4B' : '#E3E4F1' }]}>
+            <ThemedText style={[styles.footerLeft, { color: theme === 'dark' ? '#5B5E7E' : '#9495A5' }]}>
               {mergedTodos.filter((t) => !t.completed).length} items left
             </ThemedText>
 
             <View style={[styles.filterRow, { backgroundColor: cardBg }]}>
-              <ThemedText style={[styles.filterText, filter === 'all' && styles.filterActive]} onPress={() => setFilter('all')} accessibilityRole="button" accessibilityState={{ selected: filter === 'all' }}>All</ThemedText>
-              <ThemedText style={[styles.filterText, filter === 'active' && styles.filterActive]} onPress={() => setFilter('active')} accessibilityRole="button" accessibilityState={{ selected: filter === 'active' }}>Active</ThemedText>
-              <ThemedText style={[styles.filterText, filter === 'completed' && styles.filterActive]} onPress={() => setFilter('completed')} accessibilityRole="button" accessibilityState={{ selected: filter === 'completed' }}>Completed</ThemedText>
+              <ThemedText style={[styles.filterText, filter === 'all' && styles.filterActive]} onPress={() => setFilter('all')}>
+                All
+              </ThemedText>
+              <ThemedText style={[styles.filterText, filter === 'active' && styles.filterActive]} onPress={() => setFilter('active')}>
+                Active
+              </ThemedText>
+              <ThemedText style={[styles.filterText, filter === 'completed' && styles.filterActive]} onPress={() => setFilter('completed')}>
+                Completed
+              </ThemedText>
             </View>
 
-            <ThemedText 
-              style={[
-                styles.footerRight,
-                { color: theme === 'dark' ? '#5B5E7E' : '#9495A5' }
-              ]} 
-              onPress={() => clearCompleted()} 
-              accessibilityRole="button"
-            >
+            <ThemedText style={[styles.footerRight, { color: theme === 'dark' ? '#5B5E7E' : '#9495A5' }]} onPress={() => clearCompleted()}>
               Clear Completed
             </ThemedText>
           </View>
         </View>
-        
+
         <ThemedText style={styles.dragHint}>Drag and drop to reorder list</ThemedText>
       </View>
 
@@ -178,102 +168,16 @@ export const TodoList: React.FC<TodoListProps> = ({ searchQuery = '', optimistic
 };
 
 const styles = StyleSheet.create({
-  backgroundImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    minHeight: '100%',
-    paddingTop: 0, // Removed padding since header is in parent
-  },
-  listContent: {
-    paddingVertical: 0,
-  },
-    draggingItem: {
-    opacity: 0.9,
-    transform: [{ scale: 1.04 }],
-    borderRadius: 8,
-  },
-  centerWrapper: {
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 600,
-    alignSelf: 'center',
-    paddingHorizontal: 24,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 540,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: '#FFF',
-    shadowColor: 'rgba(58, 124, 253, 0.12)',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-    marginTop: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 0,
-    paddingVertical: 18,
-    borderTopWidth: 1,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    marginBottom: 8,
-  },
-  footerLeft: {
-    fontSize: 14,
-    color: '#9495A5',
-    letterSpacing: -0.19,
-  },
-  footerRight: {
-    fontSize: 14,
-    color: '#9495A5',
-    letterSpacing: -0.19,
-    paddingLeft: 12,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    borderRadius: 20,
-    backgroundColor: 'transparent',
-    paddingVertical: 8,
-    marginTop: 0,
-    marginBottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  filterText: {
-    marginHorizontal: 8,
-    fontSize: 14,
-    color: '#9495A5',
-    fontWeight: '500',
-    paddingVertical: 6,
-    // borderRadius: 16,
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
-  },
-  filterActive: {
-    fontWeight: '700',
-    shadowColor: '#3A7CFD',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-  },
-  dragHint: {
-    textAlign: 'center',
-    color: '#9495A5',
-    fontSize: 13,
-    marginTop: 12,
-    marginBottom: 0,
-    opacity: 0.7,
-  },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', minHeight: '100%', paddingTop: 0 },
+  listContent: { paddingVertical: 0 },
+  draggingItem: { opacity: 0.9, transform: [{ scale: 1.04 }], borderRadius: 8 },
+  centerWrapper: { alignItems: 'center', width: '100%', maxWidth: 600, alignSelf: 'center', paddingHorizontal: 24 },
+  card: { width: '100%', maxWidth: 540, borderRadius: 10, overflow: 'hidden', backgroundColor: '#FFF', shadowColor: 'rgba(58, 124, 253, 0.12)', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8, marginTop: 16 },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 0, paddingVertical: 18, borderTopWidth: 1, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, marginBottom: 8 },
+  footerLeft: { fontSize: 14, color: '#9495A5', letterSpacing: -0.19 },
+  footerRight: { fontSize: 14, color: '#9495A5', letterSpacing: -0.19, paddingLeft: 12 },
+  filterRow: { flexDirection: 'row', borderRadius: 20, backgroundColor: 'transparent', paddingVertical: 8, justifyContent: 'center', alignItems: 'center', gap: 8 },
+  filterText: { marginHorizontal: 8, fontSize: 14, color: '#9495A5', fontWeight: '500', paddingVertical: 6, backgroundColor: 'transparent', overflow: 'hidden' },
+  filterActive: { fontWeight: '700', shadowColor: '#3A7CFD', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 4 },
+  dragHint: { textAlign: 'center', color: '#9495A5', fontSize: 13, marginTop: 12, marginBottom: 0, opacity: 0.7 },
 });

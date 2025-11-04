@@ -3,11 +3,13 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/context/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
- 
+
 import React, { useState } from 'react';
 import {
+    KeyboardAvoidingView,
     Modal,
     Platform,
+    ScrollView,
     StyleSheet,
     TextInput,
     TouchableOpacity,
@@ -21,7 +23,7 @@ interface AddTodoProps {
 }
 
 export const AddTodo: React.FC<AddTodoProps> = ({ isVisible, onClose, onSubmit }) => {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState<Date | null>(null);
@@ -32,7 +34,6 @@ export const AddTodo: React.FC<AddTodoProps> = ({ isVisible, onClose, onSubmit }
     if (!title.trim()) return;
     setLoading(true);
 
-    // Normalize due date to UTC midnight
     let normalizedDueDate: number | undefined = undefined;
     if (dueDate) {
       const utc = new Date(Date.UTC(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()));
@@ -47,21 +48,18 @@ export const AddTodo: React.FC<AddTodoProps> = ({ isVisible, onClose, onSubmit }
           dueDate: normalizedDueDate,
         });
       }
-
       setTitle('');
       setDescription('');
       setDueDate(null);
       onClose();
     } catch (error) {
       console.error('Failed to create todo', error);
-      // could show toast
     } finally {
       setLoading(false);
     }
   };
 
   const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    // For web, event.type may be undefined, so always check selectedDate
     if ((event.type === 'set' || event.type === undefined) && selectedDate) {
       setDueDate(selectedDate);
       setShowDatePicker(Platform.OS === 'ios');
@@ -77,92 +75,118 @@ export const AddTodo: React.FC<AddTodoProps> = ({ isVisible, onClose, onSubmit }
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <ThemedView style={styles.modalContent}>
-          <View style={styles.header}>
-            <ThemedText style={styles.headerText}>Add New Todo</ThemedText>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialIcons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-
-          <TextInput
-            style={[styles.input, { color: colors.text, borderColor: colors.text }]}
-            placeholder="Title"
-            placeholderTextColor={colors.text}
-            value={title}
-            onChangeText={setTitle}
-          />
-
-          <TextInput
-            style={[
-              styles.input,
-              styles.descriptionInput,
-              { color: colors.text, borderColor: colors.text },
-            ]}
-            placeholder="Description"
-            placeholderTextColor={colors.text}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-          />
-
-          {Platform.OS === 'web' ? (
-            <View style={[styles.dateButton, { borderColor: colors.text }]}>
-              <MaterialIcons name="event" size={24} color={colors.text} />
-              <input
-                type="date"
-                style={{
-                  marginLeft: 8,
-                  fontSize: 16,
-                  flex: 1,
-                  border: 'none',
-                  padding: 0,
-                  color: colors.text,
-                  backgroundColor: 'transparent',
-                }}
-                value={dueDate ? dueDate.toISOString().split('T')[0] : ''}
-                onChange={(e) => {
-                  const date = new Date(e.target.value);
-                  setDueDate(date);
-                }}
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </View>
-          ) : (
-            <>
-              <TouchableOpacity
-                style={[styles.dateButton, { borderColor: colors.text }]}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <MaterialIcons name="event" size={24} color={colors.text} />
-                <ThemedText style={styles.dateButtonText}>
-                  {dueDate ? dueDate.toLocaleDateString() : 'Set Due Date'}
-                </ThemedText>
-              </TouchableOpacity>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={dueDate || new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={handleDateChange}
-                  minimumDate={new Date()}
-                />
-              )}
-            </>
-          )}
-
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.tint }]}
-            onPress={handleSubmit}
-            disabled={loading}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.modalOverlay}
+      >
+        <ThemedView
+          style={[
+            styles.modalContent,
+            { backgroundColor: theme === 'dark' ? '#171823' : '#ffffff' },
+          ]}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
           >
-            <ThemedText style={styles.addButtonText}>{loading ? 'Adding...' : 'Add Todo'}</ThemedText>
-          </TouchableOpacity>
+            <View style={styles.header}>
+              <ThemedText style={styles.headerText}>Add New Todo</ThemedText>
+              <TouchableOpacity onPress={onClose}>
+                <MaterialIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.text }]}
+              placeholder="Title"
+              placeholderTextColor={theme === 'dark' ? colors.icon : '#9495A5'}
+              value={title}
+              onChangeText={setTitle}
+            />
+
+            <TextInput
+              style={[
+                styles.input,
+                styles.descriptionInput,
+                { color: colors.text, borderColor: colors.text },
+              ]}
+              placeholder="Description"
+              placeholderTextColor={theme === 'dark' ? colors.icon : '#9495A5'}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+            />
+
+            {/* Date Picker */}
+            {Platform.OS === 'web' ? (
+              <View style={[styles.dateButton, { borderColor: colors.text }]}>
+                <MaterialIcons name="event" size={24} color={colors.text} />
+                <input
+                  type="date"
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 16,
+                    flex: 1,
+                    border: 'none',
+                    padding: 0,
+                    color: colors.text,
+                    backgroundColor: 'transparent',
+                  }}
+                  value={dueDate ? dueDate.toISOString().split('T')[0] : ''}
+                  onChange={(e) => setDueDate(new Date(e.target.value))}
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.dateButton, { borderColor: colors.text }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <MaterialIcons name="event" size={24} color={colors.text} />
+                  <ThemedText style={[styles.dateButtonText, { color: colors.text }]}>
+                    {dueDate ? dueDate.toLocaleDateString() : 'Set Due Date'}
+                  </ThemedText>
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={dueDate || new Date()}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+              </>
+            )}
+
+            <TouchableOpacity
+  style={[
+    styles.addButton,
+    {
+      backgroundColor: theme === 'dark' ? '#3A7CFD' : colors.tint, // bright blue in dark mode
+    },
+  ]}
+  onPress={handleSubmit}
+  disabled={loading}
+>
+  <ThemedText
+    style={[
+      styles.addButtonText,
+      {
+        color: '#fff', // white text for readability
+      },
+    ]}
+  >
+    {loading ? 'Adding...' : 'Add Todo'}
+  </ThemedText>
+</TouchableOpacity>
+
+          </ScrollView>
         </ThemedView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -170,15 +194,11 @@ export const AddTodo: React.FC<AddTodoProps> = ({ isVisible, onClose, onSubmit }
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  dateInput: {
-    marginLeft: 8,
-    fontSize: 16,
-    flex: 1,
-    borderWidth: 0,
-    padding: 0,
+  scrollContent: {
+    paddingBottom: 40,
   },
   modalContent: {
     borderTopLeftRadius: 20,
@@ -195,6 +215,7 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 20,
     fontWeight: '600',
+    color: 'white',
   },
   input: {
     borderWidth: 1,
@@ -226,7 +247,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -111,9 +111,10 @@ export default function TodosScreen() {
             accessibilityLabel={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           >
             <Image
-              source={theme === 'dark'
-                ? require('@/assets/images/combined-shape.svg')
-                : require('@/assets/images/combined-shape-1.svg')
+              source={
+                theme === 'dark'
+                  ? require('@/assets/images/icon-dark.svg')
+                  : require('@/assets/images/icon-light.svg')
               }
               style={{ width: 26, height: 26 }}
               contentFit="contain"
@@ -127,7 +128,12 @@ export default function TodosScreen() {
         <View style={[styles.headerOverlay, { backgroundColor: overlayColor }]} pointerEvents="none" />
       )}
 
-      <View style={[styles.searchRow, { alignItems: 'center', justifyContent: 'center', width: '100%' }]}> 
+      <View style={[
+        styles.searchRow,
+        { alignItems: 'center', justifyContent: 'center', width: '100%',
+          marginTop: Platform.OS === 'web' ? 48 : (screenWidth < 400 ? 12 : -36)
+        }
+      ]}> 
         <View style={[styles.searchBox, { backgroundColor: theme === 'dark' ? '#25273D' : '#ffffff', maxWidth: 540, width: '100%' }]}> 
           <MaterialIcons name="radio-button-unchecked" size={24} color={theme === 'dark' ? '#393A4B' : '#E3E4F1'} />
           <TextInput
@@ -170,22 +176,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: Platform.OS === 'web' ? 32 : 20,
   },
   headerImage: {
-    width: '100%',
     height: HEADER_IMAGE_HEIGHT,
     position: 'absolute',
     top: 0,
-    left: 0,
+    left: Platform.OS === 'web' ? 0 : -20,
+    right: Platform.OS === 'web' ? 0 : -20,
   },
- header: {
-  zIndex: 3,
+  header: {
+  zIndex: 10,
+  position: 'relative',
   marginTop: Platform.OS === 'web' ? 70 : 48,
 
   width: '100%',
   maxWidth: 540,          // same as search bar width (key)
   alignSelf: 'center',    // center it (key)
-  justifyContent: 'center',
+  justifyContent: 'flex-start',
   alignItems: 'center',
   paddingHorizontal: 0,
+  paddingBottom: 8,
 },
 
   addButton: {

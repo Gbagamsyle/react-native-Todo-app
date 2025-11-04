@@ -48,3 +48,47 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Build for web and Android (APK)
+
+This project supports running on the web and building an Android APK using EAS (Expo Application Services).
+
+Prerequisites
+- Node >= 16
+- Expo CLI: `npm install -g expo-cli` (for classic commands) or use `npx expo`.
+- EAS CLI for building native binaries: `npm install -g eas-cli` or `npx eas-cli`
+
+Build web (static export)
+
+```bash
+npm run build:web
+# Output will be in the `web-build` directory
+```
+
+Build Android (recommended: EAS)
+
+1. Install and login with EAS:
+
+```bash
+npx eas login
+```
+
+2. Configure any Android credentials via the interactive prompts or in the Expo dashboard.
+
+3. Trigger a production build (this will produce an APK/AAB depending on your `eas.json`):
+
+```bash
+npm run build:android:eas
+```
+
+If you prefer a local native build (requires Android toolchain), you can:
+
+```bash
+npm run prepare:android
+npm run build:android:local
+```
+
+Notes
+- EAS builds require a GitHub/Expo account for credentials and may prompt for signing keys.
+- If you only need a web deployment, `npm run build:web` is sufficient and produces static files you can host with any static host.
+

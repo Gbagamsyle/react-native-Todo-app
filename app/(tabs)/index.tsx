@@ -1,98 +1,134 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { TodoList } from '@/components/todo-list';
+import { useTheme } from '@/context/ThemeContext';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const { colors, theme, toggleTheme } = useTheme();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
+  return (
+    <View style={styles.container}>
+  {/* only show the top gradient in dark theme; remove gradient for light theme per design */}
+  {theme === 'dark' ? <View style={[styles.gradient, styles.gradientDark]} /> : null}
+      
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <ThemedText style={styles.title}>TODO</ThemedText>
+          <TouchableOpacity onPress={toggleTheme} accessibilityLabel="Toggle theme">
+            <MaterialIcons 
+              name={theme === 'dark' ? 'light-mode' : 'dark-mode'} 
+              size={24} 
+              color={colors.text} 
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Header artwork (desktop/mobile variants) */}
+        <View style={styles.artworkWrap} pointerEvents="none">
+          <Image
+            source={
+              theme === 'dark'
+                ? require('@/assets/images/Desktop - Dark.jpg')
+                : require('@/assets/images/Desktop - Light.jpg')
+            }
+            style={styles.artwork}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Main Card */}
+        <ThemedView style={[styles.card, Platform.OS === 'web' && styles.cardDesktop]}>
+          <View style={styles.cardInner}>
+            <TodoList />
+          </View>
+        </ThemedView>
+
+        {/* Bottom hint text */}
+        <ThemedText style={styles.dragHint}>
+          Drag and drop to reorder list
         </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    position: 'relative',
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  gradient: {
     position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '40%',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: Platform.OS === 'web' ? '20%' : 20,
+    paddingTop: Platform.OS === 'web' ? 70 : 50,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 10,
+    color: 'white',
+  },
+  card: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0px 2px 30px rgba(0,0,0,0.15)',
+      },
+    }),
+  },
+  cardDesktop: {
+    maxWidth: 600,
+    marginHorizontal: 'auto',
+  },
+  cardInner: {
+    padding: 20,
+  },
+  artworkWrap: {
+    alignItems: 'center',
+    marginBottom: 20,
+    pointerEvents: 'none',
+  },
+  artwork: {
+    width: '100%',
+    maxWidth: 560,
+    height: 140,
+  },
+  gradientLight: {
+    backgroundColor: '#9FE8FF',
+  },
+  gradientDark: {
+    backgroundColor: '#3B3A78',
+  },
+  dragHint: {
+    textAlign: 'center',
+    marginTop: 40,
+    opacity: 0.5,
+    fontSize: 14,
   },
 });

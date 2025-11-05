@@ -1,8 +1,42 @@
-# Welcome to your Expo app 👋
+# ✅ React Native Todo App (Expo + Convex)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A modern, real-time Todo application built with **Expo Router**, **React Native**, and **Convex backend**.  
+This project was built as part of the HNG Internship — focusing on clean UI, dark/light theme switching, and realtime data sync.
 
-## Get started
+---
+
+## ✨ Features
+
+| Feature | Description |
+|--------|-------------|
+| Realtime Backend | Data always stays in sync — no refresh needed |
+| CRUD Todos | Create, update, delete tasks |
+| Expo Router | App navigation powered by file-system routing |
+| Light/Dark Theme | System-aware theme switcher |
+| Web + Mobile support | Works on iOS, Android & Web |
+| Convex Database | Schema-based, strongly typed backend |
+
+---
+
+## 🧰 Tech Stack
+
+| Category | Tech |
+|---------|------|
+| Framework | React Native (Expo) |
+| Routing | Expo Router |
+| Backend | Convex |
+| Styling | React Native stylesheets (custom theme) |
+| State updates | React Hooks + Convex mutations/queries |
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone repo
+
+```bash
+git clone https://github.com/Gbagamsyle/react-native-Todo-app.git
+cd react-native-Todo-app
 
 1. Install dependencies
 
@@ -15,19 +49,11 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    ```bash
    npx expo start
    ```
+3. Connect your Convex backend
 
-In the output, you'll find options to open the app in a
+Create .env.local in project root:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+EXPO_PUBLIC_CONVEX_URL=https://<deployment>.convex.cloud
 
 ```bash
 npm run reset-project
